@@ -19,6 +19,7 @@ params.help = null
 params.input_vcf = null
 params.output_vcf = "FALSE"
 params.KG_folder = null
+params.PED = null
 params.ancestry = "EUR"
 params.output_folder = "vcf_ancestry_output"
 
@@ -40,8 +41,9 @@ if (params.help) {
     log.info ""
     log.info "Mandatory arguments:"
     log.info "--input_vcf                FILE                 Input VCF file to be filtered on ancestry"
-    log.info "--KG_folder               FOLDER               1000 genomes folder for reference"
+    log.info "--KG_folder                FOLDER               1000 genomes folder for reference"
     log.info "--fasta_ref                FILE                 Reference genome in fasta format"
+    log.info "--PED                      FILE                 Reference PED file for ancestry estimation"
     log.info ""
     log.info "Optional arguments:"
     log.info "--output_vcf               FILE                 Output VCF (default=renamed with ancestry)"
@@ -57,13 +59,13 @@ if (params.help) {
 assert (params.input_vcf != null) : "please provide the --input_vcf option"
 assert (params.fasta_ref != null) : "please provide the --fasta_ref option"
 assert (params.KG_folder != null) : "please provide the --KG_folder option"
+assert (params.PED != null) : "please provide the --PED option"
 
 vcf = file(params.input_vcf)
 fasta_ref = file(params.fasta_ref)
+ped = file(params.PED)
 
 process filter_VCF {
-
-  publishDir params.output_folder, mode: 'copy', pattern: "*_arraysnps_merged.vcf.gz"
 
   input:
   file vcf
@@ -88,8 +90,6 @@ process filter_VCF {
 }
 
 process extract_common_SNPs {
-
-  publishDir params.output_folder, mode: 'copy', pattern: "*_arraysnps_merged.vcf.gz"
 
   input:
   file vcf from filt_vcf
@@ -118,12 +118,11 @@ process extract_common_SNPs {
 
 process PCA {
 
-  publishDir params.output_folder, mode: 'copy', pattern: "*_arraysnps_merged.vcf.gz"
-
   input:
   file common_snps from common_snps
 
   output:
+  file "plink.eigenvec" into eigenvec
 
   shell:
   '''
@@ -136,5 +135,22 @@ process PCA {
 
   mkdir -p pca && cd pca
   plink --bfile ../merge/1KG_with_input_VCF --pca
+  '''
+}
+
+
+process PCA_analysis {
+
+  publishDir params.output_folder, mode: 'copy', pattern: "*_arraysnps_merged.vcf.gz"
+
+  input:
+  file eigenvec from eigenvec
+  file ped
+
+  output:
+
+  shell:
+  '''
+  Rscript !{baseDir}/bin/ --eigen=!{eigenvect} --ped=!{ped}
   '''
 }
