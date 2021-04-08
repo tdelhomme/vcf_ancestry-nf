@@ -127,6 +127,14 @@ process PCA {
 
   shell:
   '''
-  ls
+  mkdir -p merge
+  echo "common_snps/1KG_intersection_chr1" > merge/list
+  for chr in {2..22}; do echo "common_snps/1KG_intersection_chr${chr}" >> merge/list; done
+  echo "common_snps/input_VCF_intersection" >> merge/list
+
+  plink --memory 4000 --merge-list merge/list --out merge/1KG_with_input_VCF
+
+  mkdir -p pca && cd pca
+  plink --bfile ../merge/1KG_with_input_VCF --pca
   '''
 }
