@@ -29,17 +29,16 @@ rownames(eigenvec) <- eigenvec[,2]
 eigenvec <- eigenvec[,3:ncol(eigenvec)]
 colnames(eigenvec) <- paste('Principal Component ', c(1:20), sep = '')
 
-ESADids = c(which(grepl("LP", rownames(eigenvec))), which(grepl("SM", rownames(eigenvec))), which(grepl("SS", rownames(eigenvec))) )
+cohort_ids = which( !grepl("^HG0", rownames(eigenvec)) & !grepl("^NA", rownames(eigenvec)))
 
-KGids = setdiff(1:length(rownames(eigenvec)), ESADids)
-eigenvec = eigenvec[c(KGids, ESADids),]
-
-pedfile = "/g/strcombio/fsupek_cancer1/TCGA/validation/CPTAC/beagle/1K_genomes/bochet.gcc.biostat.washington.edu/beagle/1000_Genomes_phase3_v5a/PCA/20130606_g1k.ped"
+KGids = setdiff(1:length(rownames(eigenvec)), cohort_ids)
+eigenvec = eigenvec[c(KGids, cohort_ids),] # correct order, just in case
 
 PED <- read.table(pedfile, header = TRUE, skip = 0, sep = '\t')[,c("Individual.ID", "Population")]
-PED = PED[which(PED$Individual.ID %in% rownames(eigenvec)[1:2504]), ]
-PED1 = rbind(PED, data.frame(Individual.ID = rownames(eigenvec)[2505:nrow(eigenvec)], Population = "unknown"))
+PED = PED[which(PED$Individual.ID %in% rownames(eigenvec)[1:length(KGids)]), ]
+PED1 = rbind(PED, data.frame(Individual.ID = rownames(eigenvec)[(length(KGids)+1):nrow(eigenvec)], Population = "unknown"))
 PED2 <- PED1[match(rownames(eigenvec), PED1$Individual.ID),]
+print(paste(date(), " INFO: does the individuals are concordant between new PED file and eigen vector from PCA? "))
 all(PED2$Individual.ID == rownames(eigenvec)) == TRUE
 #[1] TRUE
 
@@ -66,15 +65,17 @@ project.pca <- eigenvec
 summary(project.pca)
 
 
+pdf("plots.pdf")
 par(mfrow = c(1,3))
-
 plot(project.pca[,1], project.pca[,2], col = col, pch = 20, main = 'A', adj = 0.5, cex = 2,
      xlab = 'First component', ylab = 'Second component', font = 2, font.lab = 2)
-
-legend('topright', bty = 'n', title = '', c('AFR', 'AMR', 'EAS', 'EUR', 'SAS', "ESAD-UK"),
+legend('topright', bty = 'n', title = '', c('AFR', 'AMR', 'EAS', 'EUR', 'SAS', "Input cohort"),
        fill = c('yellow', 'forestgreen', 'grey', 'royalblue', 'black', 'pink'))
-
-pdf("plots.pdf")
 plot(project.pca[,1], project.pca[,3], col = col, pch=20, cex = 2, main="B", adj=0.5, xlab="First component", ylab="Third component", font=2, font.lab=2)
 plot(project.pca[,2], project.pca[,3], col = col, pch=20, cex = 2, main="B", adj=0.5, xlab="Second component", ylab="Third component", font=2, font.lab=2)
 dev.off()
+
+project.pca$ID = rownames(project.pca)
+write.table(project.pca[,c(1:3, match("ID", colnames(project.pca)))], file="table_3PCs.txt", quote = F, row.names = F, col.names = T, sep = "\t")
+
+                        
