@@ -122,7 +122,7 @@ process PCA {
   file common_snps from common_snps
 
   output:
-  file "plink.eigenvec" into eigenvec
+  file "plink_eigenvec" into eigenvec
 
   shell:
   '''
@@ -135,22 +135,24 @@ process PCA {
 
   mkdir -p pca && cd pca
   plink --bfile ../merge/1KG_with_input_VCF --pca
+  cd .. && cp pca/plink.eigenvec plink_eigenvec
   '''
 }
 
 
 process PCA_analysis {
 
-  publishDir params.output_folder, mode: 'copy', pattern: "*_arraysnps_merged.vcf.gz"
+  publishDir params.output_folder, mode: 'copy', pattern: "*pdf"
 
   input:
   file eigenvec from eigenvec
   file ped
 
   output:
+  file "*pdf" into plots
 
   shell:
   '''
-  Rscript !{baseDir}/bin/ --eigen=!{eigenvect} --ped=!{ped}
+  Rscript !{baseDir}/bin/analysis_PCA.R --eigenvec_file=!{eigenvec} --PED=!{ped}
   '''
 }
