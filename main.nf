@@ -77,7 +77,8 @@ process filter_VCF {
   shell:
   '''
   # DR2 filtering
-  bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools filter -i 'INFO/DR2>0.3' | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
+  # bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools filter -i 'INFO/DR2>0.3' | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
+  bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
 
   # filtering on HWE and MAF
   plink --vcf tmp0.vcf.gz --maf 0.01 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf

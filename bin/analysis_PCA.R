@@ -65,7 +65,7 @@ project.pca <- eigenvec
 summary(project.pca)
 
 
-pdf("plots.pdf")
+pdf("plots.pdf", 15, 5)
 par(mfrow = c(1,3))
 plot(project.pca[,1], project.pca[,2], col = col, pch = 20, main = 'A', adj = 0.5, cex = 2,
      xlab = 'First component', ylab = 'Second component', font = 2, font.lab = 2)
