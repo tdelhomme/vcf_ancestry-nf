@@ -22,6 +22,7 @@ params.KG_folder = null
 params.PED = null
 params.ancestry = "EUR"
 params.output_folder = "vcf_ancestry_output"
+params.keep_chr = "FALSE"
 
 log.info ""
 log.info "-----------------------------------------------------------------------"
@@ -51,6 +52,7 @@ if (params.help) {
     log.info "--ancestry                 STRING               Ancestry (from 1000 genomes) for filtering samples"
     log.info ""
     log.info "Flags:"
+    log.info "--chr                                           Chr with prefix"
     log.info "--help                                          Display this message"
     log.info ""
     exit 1
@@ -99,21 +101,26 @@ process extract_common_SNPs {
   file "common_snps" into common_snps
 
   shell:
+  if(params.chr!="FALSE"){ keep_chr="yes" } else {keep_chr="no"} 
   '''
   # get input VCF snp list
   zcat !{vcf} | grep -v "^#" | cut -f3 > vcf.snps
+  sed -i 's/chr//' vcf.snps
 
   # get 1KG snp list
   touch 1KG.snps
-  for chr in {1..22}; do bcftools view !{params.KG_folder}/chr${chr}.1kg.phase3.v5a.vcf | grep -v "^#" | cut -f3 >> 1KG.snps ; done
+  for chr in {1..22}; do bcftools view !{params.KG_folder}/chr${chr}.1kg.phase3.v5a.bcf | grep -v "^#" | cut -f3 >> 1KG.snps ; done
+  sed -i 's/chr//' 1KG.snps
 
   # Make intersection file
   grep -Fxf "vcf.snps" "1KG.snps" > intersection.snps
+  cp intersection.snps intersection.snps1
+  if [ "!{keep_chr}" = "$VAR2" ]; then cat intersection.snps | awk '{print "chr" $0}' > intersection.snps1 ; fi
 
   # Extract the common scripts
   mkdir -p common_snps
   for chr in {1..22}; do plink --bfile !{params.KG_folder}/chr${chr}.1kg.phase3.v5a --extract intersection.snps --make-bed --out common_snps/1KG_intersection_chr${chr}; done
-  plink --vcf !{vcf} --const-fid 0 --extract intersection.snps --make-bed --out common_snps/input_VCF_intersection
+  plink --vcf !{vcf} --const-fid 0 --extract intersection.snps1 --make-bed --out common_snps/input_VCF_intersection
   '''
 }
 
