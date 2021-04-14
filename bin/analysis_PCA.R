@@ -78,4 +78,9 @@ dev.off()
 project.pca$ID = rownames(project.pca)
 write.table(project.pca[,c(1:3, match("ID", colnames(project.pca)))], file="table_3PCs.txt", quote = F, row.names = F, col.names = T, sep = "\t")
 
-                        
+library(tclust)
+res = tclust(project.pca[,which(!grepl("ID", colnames(project.pca)))])
+project.pca$cluster = res$cl
+project.pca$ancestry = unlist(lapply(project.pca$ID, function(id) PED[which(PED$Individual.ID==id),"Population"]))
+
+plot(project.pca$`Principal Component 2`, project.pca$`Principal Component 3`, col=project.pca$cluster, pch=19)

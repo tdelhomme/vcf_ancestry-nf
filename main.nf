@@ -81,7 +81,7 @@ process filter_VCF {
   bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
 
   # filtering on HWE and MAF
-  plink --vcf tmp0.vcf.gz --maf 0.01 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf
+  plink --vcf tmp0.vcf.gz --maf 0.1 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf
 
   # LD pruning
   plink --vcf filtered_vcf.vcf --indep-pairwise 50 5 0.5 --out filtered_vcf_LD_prun
