@@ -52,7 +52,7 @@ if (params.help) {
     log.info "--ancestry                 STRING               Ancestry (from 1000 genomes) for filtering samples"
     log.info ""
     log.info "Flags:"
-    log.info "--chr                                           Chr with prefix"
+    log.info "--keep_chr                                           Chr with prefix"
     log.info "--help                                          Display this message"
     log.info ""
     exit 1
@@ -101,7 +101,7 @@ process extract_common_SNPs {
   file "common_snps" into common_snps
 
   shell:
-  if(params.chr!="FALSE"){ keep_chr="yes" } else {keep_chr="no"} 
+  if(params.keep_chr!="FALSE"){ keep_chr="yes" } else {keep_chr="no"} 
   '''
   # get input VCF snp list
   zcat !{vcf} | grep -v "^#" | cut -f3 > vcf.snps
@@ -115,7 +115,7 @@ process extract_common_SNPs {
   # Make intersection file
   grep -Fxf "vcf.snps" "1KG.snps" > intersection.snps
   cp intersection.snps intersection.snps1
-  if [ "!{keep_chr}" = "$VAR2" ]; then cat intersection.snps | awk '{print "chr" $0}' > intersection.snps1 ; fi
+  if [ "!{keep_chr}" = "yes" ]; then cat intersection.snps | awk '{print "chr" $0}' > intersection.snps1 ; fi
 
   # Extract the common scripts
   mkdir -p common_snps
@@ -151,6 +151,7 @@ process PCA {
 process PCA_analysis {
 
   publishDir params.output_folder, mode: 'copy', pattern: "*pdf"
+  publishDir params.output_folder, mode: 'copy', pattern: "table_3PCs.txt"
 
   input:
   file eigenvec from eigenvec
@@ -158,6 +159,7 @@ process PCA_analysis {
 
   output:
   file "*pdf" into plots
+  file "table_3PCs.txt" into res
 
   shell:
   '''
