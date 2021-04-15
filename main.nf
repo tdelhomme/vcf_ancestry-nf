@@ -80,6 +80,7 @@ process filter_VCF {
   '''
   # DR2 filtering
   # bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools filter -i 'INFO/DR2>0.3' | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
+  tabix -p vcf !{vcf}
   bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
 
   # filtering on HWE and MAF
