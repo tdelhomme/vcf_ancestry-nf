@@ -23,6 +23,11 @@ params.PED = null
 params.ancestry = "EUR"
 params.output_folder = "vcf_ancestry_output"
 params.keep_chr = "FALSE"
+params.cohort = "UNKNOWN_COHORT"
+params.cpu = "40"
+params.beagle = null
+params.maps_folder = null
+params.impref_folder = null
 
 log.info ""
 log.info "-----------------------------------------------------------------------"
@@ -50,9 +55,10 @@ if (params.help) {
     log.info "--output_vcf               FILE                 Output VCF (default=renamed with ancestry)"
     log.info "--output_folder            FOLDER               Output folder (default=vcf_ancestry_output)"
     log.info "--ancestry                 STRING               Ancestry (from 1000 genomes) for filtering samples"
+    log.info "--cohort               STRING                 Name of the cohort to output the final vcf (default:UNKNOWN_COHORT)"
     log.info ""
     log.info "Flags:"
-    log.info "--keep_chr                                           Chr with prefix"
+    log.info "--keep_chr                                      Chr with prefix"
     log.info "--help                                          Display this message"
     log.info ""
     exit 1
@@ -62,10 +68,15 @@ assert (params.input_vcf != null) : "please provide the --input_vcf option"
 assert (params.fasta_ref != null) : "please provide the --fasta_ref option"
 assert (params.KG_folder != null) : "please provide the --KG_folder option"
 assert (params.PED != null) : "please provide the --PED option"
+assert (params.beagle != null) : "please provide the --beagle option"
+assert (params.maps_folder != null) : "please provide the --maps_folder option"
+assert (params.impref_folder != null) : "please provide the --ref_folder option"
 
 vcf = file(params.input_vcf)
 fasta_ref = file(params.fasta_ref)
 ped = file(params.PED)
+bg = file(params.beagle)
+chrs = Channel.of( 1..22 )
 
 process filter_VCF {
 
@@ -82,13 +93,58 @@ process filter_VCF {
   # bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools filter -i 'INFO/DR2>0.3' | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
   tabix -p vcf !{vcf}
   bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
+
   # filtering on HWE and MAF
   plink --vcf tmp0.vcf.gz --maf 0.1 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf
+
   # LD pruning
   plink --vcf filtered_vcf.vcf --indep-pairwise 50 5 0.5 --out filtered_vcf_LD_prun
   plink --vcf filtered_vcf.vcf --extract filtered_vcf_LD_prun.prune.in --recode vcf --out filtered_vcf_prun
   bgzip -c filtered_vcf_prun.vcf > tmp.vcf.gz
   '''
+}
+
+process imputation {
+
+    cpus params.cpu
+
+    tag {chr}
+
+    input:
+    val chr from chrs
+    file bg
+    file vcf from filt_vcf
+
+    output:
+    file("*.vcf.gz") into imp_res
+
+    shell:
+    pref = input_vcf.baseName
+    '''
+    java -jar -Xmx!{task.memory.toGiga()}g !{bg} impute=false map=!{params.maps_folder}/plink.chr!{chr}.GRCh37.map chrom=!{chr} gt=!{vcf} ref=!{params.impref_folder}/chr!{chr}.1kg.phase3.v5a.vcf.gz  out=!{pref}_imputed_!{chr} nthreads=!{params.cpu}
+    '''
+}
+
+process merge_imputed_vcf {
+
+  input:
+  file fasta_ref
+  file all_chr from imp_res.collect()
+
+  output:
+  file("*.vcf.gz") into final_vcf
+
+  shell:
+  '''
+  for f in `ls *vcf.gz`
+  do
+    filename=`basename $f`
+    tabix -p vcf $f
+    bcftools filter -i 'INFO/DR2>0.3' $f | bgzip -c > ${filename}_DR2filter.vcf.gz
+  done
+  bcftools concat *{1..22}_DR2filter.vcf.gz | bcftools norm -m - -Oz -f !{fasta_ref} > !{params.cohort}_plinkfilt_imputed_allchr_DR2filter_norm.vcf.gz
+  '''
+
 }
 
 process extract_common_SNPs {
@@ -105,14 +161,17 @@ process extract_common_SNPs {
   # get input VCF snp list
   zcat !{vcf} | grep -v "^#" | cut -f3 > vcf.snps
   sed -i 's/chr//' vcf.snps
+
   # get 1KG snp list
   touch 1KG.snps
   for chr in {1..22}; do bcftools view !{params.KG_folder}/chr${chr}.1kg.phase3.v5a.bcf | grep -v "^#" | cut -f3 >> 1KG.snps ; done
   sed -i 's/chr//' 1KG.snps
+
   # Make intersection file
   grep -Fxf "vcf.snps" "1KG.snps" > intersection.snps
   cp intersection.snps intersection.snps1
   if [ "!{keep_chr}" = "yes" ]; then cat intersection.snps | awk '{print "chr" $0}' > intersection.snps1 ; fi
+
   # Extract the common scripts
   mkdir -p common_snps
   for chr in {1..22}; do plink --bfile !{params.KG_folder}/chr${chr}.1kg.phase3.v5a --extract intersection.snps --make-bed --out common_snps/1KG_intersection_chr${chr}; done
@@ -134,7 +193,9 @@ process PCA {
   echo "common_snps/1KG_intersection_chr1" > merge/list
   for chr in {2..22}; do echo "common_snps/1KG_intersection_chr${chr}" >> merge/list; done
   echo "common_snps/input_VCF_intersection" >> merge/list
+
   plink --memory 4000 --merge-list merge/list --out merge/1KG_with_input_VCF
+
   mkdir -p pca && cd pca
   plink --bfile ../merge/1KG_with_input_VCF --pca
   cd .. && cp pca/plink.eigenvec plink_eigenvec
