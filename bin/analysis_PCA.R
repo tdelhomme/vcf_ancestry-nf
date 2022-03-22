@@ -16,6 +16,7 @@ if(! is.null(args$help)) {
       --PED                      - PED file for reference
 
       Optional arguments:
+      --nPC_out                  - Number of PCs to output
 
       --help \n\n")
   q(save="no")
@@ -23,6 +24,9 @@ if(! is.null(args$help)) {
 
 if(is.null(args$eigenvec_file)) {stop("Option --eigenvec_file should be provided")} else{eigenvec_file=args$eigenvec_file}
 if(is.null(args$PED)) {stop("Option --PED should be provided")} else{pedfile=args$PED}
+if(is.null(args$nPC_out)) {nPC_out=3} else{nPC_out=as.numeric(args$nPC_out)}
+
+print(paste(date(), "INFO: the output will contain the first ", nPC_out, " PCs", sep=""))
 
 eigenvec <- read.table(eigenvec_file, header = FALSE, skip=0, sep = ' ')
 rownames(eigenvec) <- eigenvec[,2]
@@ -76,7 +80,8 @@ plot(project.pca[,2], project.pca[,3], col = col, pch=20, cex = 2, main="B", adj
 dev.off()
 
 project.pca$ID = rownames(project.pca)
-write.table(project.pca[,c(1:3, match("ID", colnames(project.pca)))], file="table_3PCs.txt", quote = F, row.names = F, col.names = T, sep = "\t")
+write.table(project.pca[,c(1:nPC_out, match("ID", colnames(project.pca)))], file=paste("table_",nPC_out,"PCs.txt",sep=""),
+            quote = F, row.names = F, col.names = T, sep = "\t")
 
 library(tclust)
 res = tclust(project.pca[,which(!grepl("ID", colnames(project.pca)))])
