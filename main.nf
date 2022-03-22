@@ -23,6 +23,7 @@ params.PED = null
 params.ancestry = "EUR"
 params.output_folder = "vcf_ancestry_output"
 params.keep_chr = "FALSE"
+params.nPC_out = 3
 
 log.info ""
 log.info "-----------------------------------------------------------------------"
@@ -50,6 +51,7 @@ if (params.help) {
     log.info "--output_vcf               FILE                 Output VCF (default=renamed with ancestry)"
     log.info "--output_folder            FOLDER               Output folder (default=vcf_ancestry_output)"
     log.info "--ancestry                 STRING               Ancestry (from 1000 genomes) for filtering samples"
+    log.info "--nPC_out                  INT                  Number of PCs to output after plink analysis (Default=3)"
     log.info ""
     log.info "Flags:"
     log.info "--keep_chr                                           Chr with prefix"
@@ -82,11 +84,11 @@ process filter_VCF {
   # bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools filter -i 'INFO/DR2>0.3' | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
   tabix -p vcf !{vcf}
   bcftools norm -m - -Oz -f !{fasta_ref} !{vcf} | bcftools annotate -x ID -I +'%CHROM:%POS:%REF:%ALT' > tmp0.vcf.gz
-  # filtering on HWE and MAF
-  plink --vcf tmp0.vcf.gz --maf 0.1 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf
+  # filtering on HWE and MAF -- NOTE: we added the --const-fid 0 in plink because we have "_" in the sample IDs, plink not happy
+  plink --const-fid 0 --vcf tmp0.vcf.gz --maf 0.1 --hwe 1e-6 --make-bed --out filtered_vcf --recode vcf
   # LD pruning
-  plink --vcf filtered_vcf.vcf --indep-pairwise 50 5 0.5 --out filtered_vcf_LD_prun
-  plink --vcf filtered_vcf.vcf --extract filtered_vcf_LD_prun.prune.in --recode vcf --out filtered_vcf_prun
+  plink --const-fid 0 --vcf filtered_vcf.vcf --indep-pairwise 50 5 0.5 --out filtered_vcf_LD_prun
+  plink --const-fid 0 --vcf filtered_vcf.vcf --extract filtered_vcf_LD_prun.prune.in --recode vcf --out filtered_vcf_prun
   bgzip -c filtered_vcf_prun.vcf > tmp.vcf.gz
   '''
 }
@@ -157,6 +159,6 @@ process PCA_analysis {
 
   shell:
   '''
-  Rscript !{baseDir}/bin/analysis_PCA.R --eigenvec_file=!{eigenvec} --PED=!{ped}
+  Rscript !{baseDir}/bin/analysis_PCA.R --eigenvec_file=!{eigenvec} --PED=!{ped} --nPC_out=!{params.nPC_out}
   '''
 }
